@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  scrappy:
+    build:
+      context: ./../..
+      dockerfile: ./infra/docker/scrappy/Dockerfile
+    volumes:
+      - type: bind
+        source: ./../../scrap
+        target: /scrap
