@@ -63,7 +63,7 @@ def save_latest_date(saved_date):
 def send_to_telegram(element):
 
     apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
-    chatID = '@BharatKiSamachar'
+    chatID = os.getenv('TELEGRAM_CHAT_ID')
     apiURL = f'https://api.telegram.org/bot{apiToken}/sendMessage'
     headers = {'Content-Type': 'application/json'}
     url = element[1]
@@ -100,7 +100,7 @@ def get_hindi_translation(original):
     return hindi_translation
 
 def main():
-    cookies = {'_sid': 'MTcwNjg1NzczMDc1OS5tZ2Y%3D'}
+    cookies = {'_sid': os.getenv("SID")}
     headers = {
         'authority': 'www.business-standard.com',
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
