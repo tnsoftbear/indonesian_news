@@ -8,6 +8,13 @@ import re
 
 load_dotenv()
 
+class PostDto:
+    def __init__(self, title, url, dt, img_url, article):
+        self.title = title
+        self.url = url
+        self.dt = dt
+        self.img_url = img_url
+        self.article = article
 
 def get_page_data(url):
     cookies = {"_sid": os.getenv("SID")}
@@ -64,8 +71,8 @@ def extract_image_url(cardlist):
     url = img["src"]
     return url
 
-def extract_elements_from_page(soup):
-    elements = []
+def extract_post_dtos_from_page(soup):
+    postDtos = []
     cardlists = soup.find_all("div", class_="cardlist")
     for cardlist in cardlists:
         title, url = extract_title_and_url(cardlist)
@@ -73,17 +80,18 @@ def extract_elements_from_page(soup):
             continue
         dt = extract_date(cardlist)
         img_url = extract_image_url(cardlist)
-        elements.append([title, url, dt, img_url])
+        dto = PostDto(title=title, url=url, dt=dt, img_url=img_url, article=None)
+        postDtos.append(dto)
 
     sorted_by_date = []
-    if elements:
-        sorted_by_date = sorted(elements, key=lambda x: x[2])
+    if postDtos:
+        sorted_by_date = sorted(postDtos, key=lambda x: x.dt)
     return sorted_by_date
 
 
-def print_elements(sorted_elements):
-    for element in sorted_elements:
-        print(f"url: {element[0]}, title: {element[1]}, date: {element[2]}")
+# def print_elements(sorted_elements):
+#     for element in sorted_elements:
+#         print(f"url: {element[0]}, title: {element[1]}, date: {element[2]}")
 
 
 def save_latest_date(date):
@@ -95,16 +103,16 @@ def save_latest_date(date):
     print("Saved last article date is: ", date)
 
 
-def send_message_to_telegram(element):
+def send_message_to_telegram(postDto):
 
     apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
     chatID = os.getenv("TELEGRAM_CHAT_ID")
     apiURL = f"https://api.telegram.org/bot{apiToken}/sendMessage"
     headers = {"Content-Type": "application/json"}
-    url = element[1]
-    hindi = get_hindi_translation(element[0])
+    url = postDto.url
+    hindi = get_hindi_translation(postDto.title)
     text = f"<a href=\"{url}\">{hindi}</a>"
-    print(f"Sending to telegram: {text} of date: {element[2]}")
+    print(f"Sending to telegram: {text} of date: {postDto.dt}")
 
     try:
         data = {
@@ -116,30 +124,29 @@ def send_message_to_telegram(element):
     except Exception as e:
         print(e)
        
-def send_photo_to_telegram(element):
+def send_photo_to_telegram(postDto):
     apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
     chatID = os.getenv("TELEGRAM_CHAT_ID")
     apiURL = f"https://api.telegram.org/bot{apiToken}/sendPhoto"
     headers = {"Content-Type": "application/json"}
-    url = element[1]
-    image_url = element[3]
-    text = f"<a href=\"{url}\">{element[0]}</a>"
-    if len(element) > 4:
-        text += "\n\n" + element[4][:1024]
+    caption = f"<a href=\"{postDto.url}\">{postDto.title}</a>"
+    if postDto.article:
+        caption += "\n\n" + postDto.article[:1024]
 
     desired_length = 1024
-    text = get_hindi_translation_limited(text, desired_length)
-    if len(text) > desired_length:
-        text = text[:desired_length]
-        text = re.sub(r'\s[^\s]*$', '', text) + " ..."
+    caption = get_hindi_translation_limited(caption, desired_length)
+    if len(caption) > desired_length:
+        desired_length -= 4
+        caption = caption[:desired_length]
+        caption = re.sub(r'\s[^\s]*$', '', caption) + " ..."
     
-    print(f"Sending to telegram: {text} of date: {element[2]}")
+    print(f"Sending to telegram: {caption} of date: {postDto.dt}")
 
     try:
         data = {
             "chat_id": chatID,
-            "photo": image_url,
-            "caption": text,
+            "photo": postDto.img_url,
+            "caption": caption,
             "parse_mode": "HTML",
         }
         response = requests.post(apiURL, json=data, headers=headers)
@@ -164,7 +171,7 @@ def get_hindi_translation(original):
 def get_hindi_translation_limited(original, limit):
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
-    content = f"Return translation to Hindi, do not exceed {limit} characters: '{original}'"
+    content = f"Return translation to Hindi. Do not exceed {limit} characters. Keep link in the beginning: '{original}'"
 
     chat_completion = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -186,22 +193,21 @@ def extract_article(html):
             article += paragraph + "\n"
     return article
 
-def enrich_with_article_data(element):
-    url = element[1]
-    response = get_page_data(url)
+def enrich_with_article_data(postDto):
+    response = get_page_data(postDto.url)
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, "html.parser")
         story_image = soup.find("div", class_="story-image")
         img = story_image.find("img")
         if img:
-            element[3] = img["src"]
+            postDto.img_url = img["src"]
         html = soup.find('div', class_="storycontent")
-        if not html:
-            html = soup.find('div', class_="text")
+        # if not html:
+        #     html = soup.find('div', class_="text")
         if html:
             article = extract_article(html)
-            element.append(article)
-        return element
+            postDto.article = article
+        return postDto
 
 def main():
     url = "https://www.business-standard.com/latest-news"
@@ -216,13 +222,13 @@ def main():
             print("Collecting all articles")
 
         soup = BeautifulSoup(response.text, "html.parser")
-        elements = extract_elements_from_page(soup)
-        print("Total articles found: ", len(elements))
+        postDtos = extract_post_dtos_from_page(soup)
+        print("Total articles found: ", len(postDtos))
 
         actual_elements = []
-        for element in elements:
-            if not saved_date or element[2] > saved_date:
-                actual_elements.append(element)
+        for postDto in postDtos:
+            if not saved_date or postDto.dt > saved_date:
+                actual_elements.append(postDto)
 
         if not actual_elements:
             print("No new articles found.")
@@ -230,15 +236,15 @@ def main():
         else:
             print("Found new articles: ", len(actual_elements))
 
-        for index, element in enumerate(actual_elements):
+        for index, postDto in enumerate(actual_elements):
             # if index % 2 == 0:
-            element = enrich_with_article_data(element)
-            send_photo_to_telegram(element)
+            postDto = enrich_with_article_data(postDto)
+            send_photo_to_telegram(postDto)
             # else:
             #     send_message_to_telegram(element)
             # break
 
-        save_latest_date(element[2])
+        save_latest_date(postDto.dt)
     else:
         print(f"Failed to fetch the page. Status code: {response.status_code}")
 
