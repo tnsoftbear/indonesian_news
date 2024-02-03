@@ -38,6 +38,12 @@ def extract_title_and_url(cardlist):
     title = h.text.strip()
     return title, url
 
+def extract_image_url(cardlist):
+    img = cardlist.find("img")
+    if not img:
+        return None
+    url = img["src"]
+    return url
 
 def extract_elements_from_page(soup):
     elements = []
@@ -47,7 +53,8 @@ def extract_elements_from_page(soup):
         if not title:
             continue
         dt = extract_date(cardlist)
-        elements.append([title, url, dt])
+        img_url = extract_image_url(cardlist)
+        elements.append([title, url, dt, img_url])
 
     sorted_by_date = []
     if elements:
@@ -69,7 +76,7 @@ def save_latest_date(date):
     print("Saved last article date is: ", date)
 
 
-def send_to_telegram(element):
+def send_message_to_telegram(element):
 
     apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
     chatID = os.getenv("TELEGRAM_CHAT_ID")
@@ -77,19 +84,41 @@ def send_to_telegram(element):
     headers = {"Content-Type": "application/json"}
     url = element[1]
     hindi = get_hindi_translation(element[0])
-    text = f"[{hindi}]({url})"
+    text = f"<a href=\"{url}\">{hindi}</a>"
     print(f"Sending to telegram: {text} of date: {element[2]}")
 
     try:
         data = {
             "chat_id": chatID,
             "text": text,
-            "parse_mode": "Markdown",
+            "parse_mode": "HTML",
         }
         response = requests.post(apiURL, json=data, headers=headers)
     except Exception as e:
         print(e)
 
+def send_photo_to_telegram(element):
+
+    apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
+    chatID = os.getenv("TELEGRAM_CHAT_ID")
+    apiURL = f"https://api.telegram.org/bot{apiToken}/sendPhoto"
+    headers = {"Content-Type": "application/json"}
+    url = element[1]
+    image_url = element[3]
+    hindi = get_hindi_translation(element[0])
+    text = f"<a href=\"{url}\">{hindi}</a>"
+    print(f"Sending to telegram: {text} of date: {element[2]}")
+
+    try:
+        data = {
+            "chat_id": chatID,
+            "photo": image_url,
+            "caption": text,
+            "parse_mode": "HTML",
+        }
+        response = requests.post(apiURL, json=data, headers=headers)
+    except Exception as e:
+        print(e)
 
 def get_hindi_translation(original):
     api_key = os.getenv("OPENAI_API_KEY")
@@ -153,8 +182,11 @@ def main():
 
         elements = actual_elements
 
-        for element in actual_elements:
-            send_to_telegram(element)
+        for index, element in enumerate(actual_elements):
+            if index % 2 == 0:
+                send_photo_to_telegram(element)
+            else:
+                send_message_to_telegram(element)
 
         save_latest_date(element[2])
     else:
