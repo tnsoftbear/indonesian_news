@@ -14,3 +14,10 @@
 4) Rename `/scrap/.env-sample` to `/scrap/.env` and fill the variables.
 
 5) Run `make run`
+
+## Development
+
+```sh
+# Enter container
+docker run -it -v ./scrap:/scrap scrap-news-scrappy sh
+```
