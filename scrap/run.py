@@ -48,6 +48,14 @@ def load_saved_date():
         return None
     return saved_date
 
+def load_sent_urls():
+    urls = []
+    try:
+        with open("sent_urls.txt", "r") as file:
+            urls = [line.strip() for line in file]
+    except:
+        urls = []
+    return urls
 
 def extract_date(cardlist):
     date_info = cardlist.find("div", class_="meta-info").text.strip()
@@ -102,6 +110,17 @@ def save_latest_date(date):
         os.chmod(filename, 0o666)
     print("Saved last article date is: ", date)
 
+def save_sent_urls(sent_urls):
+    last_urls = sent_urls[-10:]
+    filename = "sent_urls.txt"
+    with open(filename, "w") as file:
+        file.write('\n'.join(last_urls))
+        os.chmod(filename, 0o666)
+
+def check_url_already_sent(url_to_check, sent_urls):
+    if url_to_check in sent_urls:
+        return 1
+    return 0
 
 def send_message_to_telegram(postDto):
 
@@ -215,6 +234,7 @@ def main():
     response = get_page_data(url)
 
     if response.status_code == 200:
+        sent_urls = load_sent_urls()
         saved_date = load_saved_date()
         if saved_date:
             print(f"Collecting articles starting from date: {saved_date}")
@@ -227,6 +247,9 @@ def main():
 
         actual_elements = []
         for postDto in postDtos:
+            if check_url_already_sent(postDto.url, sent_urls):
+                print(f"News with this url {postDto.url} was already sent. Skipping...")
+                continue
             if not saved_date or postDto.dt > saved_date:
                 actual_elements.append(postDto)
 
@@ -240,6 +263,8 @@ def main():
             # if index % 2 == 0:
             postDto = enrich_with_article_data(postDto)
             send_photo_to_telegram(postDto)
+            sent_urls.append(postDto.url)
+            save_sent_urls(sent_urls)
             # else:
             #     send_message_to_telegram(element)
             # break
