@@ -2,19 +2,12 @@ import requests
 from dotenv import load_dotenv
 import os
 from datetime import datetime
-from bs4 import BeautifulSoup
 from openai import OpenAI
 import re
+from web_input.page_extractor import PageExtractor
+from web_input.article_extractor import ArticleExtractor
 
 load_dotenv()
-
-class PostDto:
-    def __init__(self, title, url, dt, img_url, article):
-        self.title = title
-        self.url = url
-        self.dt = dt
-        self.img_url = img_url
-        self.article = article
 
 def get_page_data(url):
     cookies = {"_sid": os.getenv("SID")}
@@ -41,7 +34,7 @@ def get_page_data(url):
 
 def load_saved_date():
     try:
-        with open("saved_date.txt", "r") as file:
+        with open("storage/saved_date.txt", "r") as file:
             saved_date_iso = file.read().strip()
             saved_date = datetime.fromisoformat(saved_date_iso)
     except:
@@ -51,76 +44,29 @@ def load_saved_date():
 def load_sent_urls():
     urls = []
     try:
-        with open("sent_urls.txt", "r") as file:
+        with open("storage/sent_urls.txt", "r") as file:
             urls = [line.strip() for line in file]
     except:
         urls = []
     return urls
 
-def extract_date(cardlist):
-    date_info = cardlist.find("div", class_="meta-info").text.strip()
-    date_formatted = date_info.split("Last Updated :")[1].strip()[:-4]
-    dt = datetime.strptime(date_formatted, "%b %d %Y | %I:%M %p")
-    return dt
-
-
-def extract_title_and_url(cardlist):
-    h = cardlist.find(["h2", "h3", "h4"])
-    if not h:
-        return None, None
-    url = h.a["href"]
-    title = h.text.strip()
-    return title, url
-
-def extract_image_url(cardlist):
-    img = cardlist.find("img")
-    if not img:
-        return None
-    url = img["src"]
-    return url
-
-def extract_post_dtos_from_page(soup):
-    postDtos = []
-    cardlists = soup.find_all("div", class_="cardlist")
-    for cardlist in cardlists:
-        title, url = extract_title_and_url(cardlist)
-        if not title:
-            continue
-        dt = extract_date(cardlist)
-        img_url = extract_image_url(cardlist)
-        dto = PostDto(title=title, url=url, dt=dt, img_url=img_url, article=None)
-        postDtos.append(dto)
-
-    sorted_by_date = []
-    if postDtos:
-        sorted_by_date = sorted(postDtos, key=lambda x: x.dt)
-    return sorted_by_date
-
-
-# def print_elements(sorted_elements):
-#     for element in sorted_elements:
-#         print(f"url: {element[0]}, title: {element[1]}, date: {element[2]}")
-
-
 def save_latest_date(date):
     date_iso = date.isoformat()
-    filename = "saved_date.txt"
+    filename = "storage/saved_date.txt"
     with open(filename, "w") as file:
         file.write(date_iso)
         os.chmod(filename, 0o666)
     print("Saved last article date is: ", date)
 
-def save_sent_urls(sent_urls):
+def update_sent_urls(sent_urls):
     last_urls = sent_urls[-10:]
-    filename = "sent_urls.txt"
+    filename = "storage/sent_urls.txt"
     with open(filename, "w") as file:
         file.write('\n'.join(last_urls))
         os.chmod(filename, 0o666)
 
 def check_url_already_sent(url_to_check, sent_urls):
-    if url_to_check in sent_urls:
-        return 1
-    return 0
+    return url_to_check in sent_urls
 
 def send_message_to_telegram(postDto):
 
@@ -140,6 +86,34 @@ def send_message_to_telegram(postDto):
             "parse_mode": "HTML",
         }
         response = requests.post(apiURL, json=data, headers=headers)
+    except Exception as e:
+        print(e)
+
+def send_message_with_image_to_telegram(postDto):
+
+    apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
+    chatID = os.getenv("TELEGRAM_CHAT_ID")
+    apiURL = f"https://api.telegram.org/bot{apiToken}/sendMessage"
+    headers = {"Content-Type": "application/json"}
+    url = postDto.url
+    limit = 4092
+    article = postDto.article[:limit] if postDto.article is not None else ""
+    text = f'{postDto.title}\n\n{article}'
+    # limit = 1024 - len(postDto.img_url) - 7;
+    print(text)
+    hindi = get_hindi_translation_limited2(text, limit)
+    text = f"[ ]({postDto.img_url} {hindi}"
+    print(f"Sending to telegram: {text} of date: {postDto.dt}")
+
+    try:
+        data = {
+            "chat_id": chatID,
+            "text": text,
+            "parse_mode": "Markdown",
+        }
+        response = requests.post(apiURL, json=data, headers=headers)
+        print(response)
+        print(response.content)
     except Exception as e:
         print(e)
        
@@ -202,31 +176,28 @@ def get_hindi_translation_limited(original, limit):
     hindi_translation = chat_completion.choices[0].message.content
     return hindi_translation
 
-def extract_article(html):
-    divs_without_class = html.find_all('div', class_=False)
-    article = ""
-    for div in divs_without_class:
-        paragraph = div.text.strip()
-        paragraph = re.sub(r'\s{3,}', '\n\n', paragraph)
-        if len(paragraph) > 0:
-            article += paragraph + "\n"
-    return article
+
+def get_hindi_translation_limited2(original, limit):
+    api_key = os.getenv("OPENAI_API_KEY")
+    client = OpenAI(api_key=api_key)
+    content = f"Formulate text to be an article. Return translation to Hindi. Do not exceed {limit} characters. Keep Markdown format: '{original}'"
+
+    chat_completion = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": content}
+        ],
+    )
+
+    hindi_translation = chat_completion.choices[0].message.content
+    return hindi_translation
 
 def enrich_with_article_data(postDto):
     response = get_page_data(postDto.url)
     if response.status_code == 200:
-        soup = BeautifulSoup(response.text, "html.parser")
-        story_image = soup.find("div", class_="story-image")
-        img = story_image.find("img")
-        if img:
-            postDto.img_url = img["src"]
-        html = soup.find('div', class_="storycontent")
-        # if not html:
-        #     html = soup.find('div', class_="text")
-        if html:
-            article = extract_article(html)
-            postDto.article = article
-        return postDto
+        article_extractor = ArticleExtractor(response.text)
+        postDto = article_extractor.extract(postDto)
+    return postDto
 
 def main():
     url = "https://www.business-standard.com/latest-news"
@@ -241,8 +212,8 @@ def main():
         else:
             print("Collecting all articles")
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        postDtos = extract_post_dtos_from_page(soup)
+        page_extractor = PageExtractor(response.text)
+        postDtos = page_extractor.extract_post_dtos_from_page()
         print("Total articles found: ", len(postDtos))
 
         actual_elements = []
@@ -263,11 +234,12 @@ def main():
             # if index % 2 == 0:
             postDto = enrich_with_article_data(postDto)
             send_photo_to_telegram(postDto)
+            # send_message_with_image_to_telegram(postDto)
             sent_urls.append(postDto.url)
-            save_sent_urls(sent_urls)
+            update_sent_urls(sent_urls)
             # else:
             #     send_message_to_telegram(element)
-            # break
+            break
 
         save_latest_date(postDto.dt)
     else:
