@@ -1,11 +1,11 @@
-import requests
-from dotenv import load_dotenv
-import os
 from datetime import datetime
-from openai import OpenAI
-import re
-from web_input.page_extractor import PageExtractor
+from dotenv import load_dotenv
 from web_input.article_extractor import ArticleExtractor
+from web_input.page_extractor import PageExtractor
+from translate.hindi_translator import HindiTranslator
+from publish.telegram.telegram_publisher import TelegramPublisher
+import os
+import requests
 
 load_dotenv()
 
@@ -68,130 +68,6 @@ def update_sent_urls(sent_urls):
 def check_url_already_sent(url_to_check, sent_urls):
     return url_to_check in sent_urls
 
-def send_message_to_telegram(postDto):
-
-    apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
-    chatID = os.getenv("TELEGRAM_CHAT_ID")
-    apiURL = f"https://api.telegram.org/bot{apiToken}/sendMessage"
-    headers = {"Content-Type": "application/json"}
-    url = postDto.url
-    hindi = get_hindi_translation(postDto.title)
-    text = f"<a href=\"{url}\">{hindi}</a>"
-    print(f"Sending to telegram: {text} of date: {postDto.dt}")
-
-    try:
-        data = {
-            "chat_id": chatID,
-            "text": text,
-            "parse_mode": "HTML",
-        }
-        response = requests.post(apiURL, json=data, headers=headers)
-    except Exception as e:
-        print(e)
-
-def send_message_with_image_to_telegram(postDto):
-
-    apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
-    chatID = os.getenv("TELEGRAM_CHAT_ID")
-    apiURL = f"https://api.telegram.org/bot{apiToken}/sendMessage"
-    headers = {"Content-Type": "application/json"}
-    url = postDto.url
-    limit = 4092
-    article = postDto.article[:limit] if postDto.article is not None else ""
-    text = f'{postDto.title}\n\n{article}'
-    # limit = 1024 - len(postDto.img_url) - 7;
-    print(text)
-    hindi = get_hindi_translation_limited2(text, limit)
-    text = f"[ ]({postDto.img_url} {hindi}"
-    print(f"Sending to telegram: {text} of date: {postDto.dt}")
-
-    try:
-        data = {
-            "chat_id": chatID,
-            "text": text,
-            "parse_mode": "Markdown",
-        }
-        response = requests.post(apiURL, json=data, headers=headers)
-        print(response)
-        print(response.content)
-    except Exception as e:
-        print(e)
-       
-def send_photo_to_telegram(postDto):
-    apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
-    chatID = os.getenv("TELEGRAM_CHAT_ID")
-    apiURL = f"https://api.telegram.org/bot{apiToken}/sendPhoto"
-    headers = {"Content-Type": "application/json"}
-    caption = f"<a href=\"{postDto.url}\">{postDto.title}</a>"
-    if postDto.article:
-        caption += "\n\n" + postDto.article[:1024]
-
-    desired_length = 1024
-    caption = get_hindi_translation_limited(caption, desired_length)
-    if len(caption) > desired_length:
-        desired_length -= 4
-        caption = caption[:desired_length]
-        caption = re.sub(r'\s[^\s]*$', '', caption) + " ..."
-    
-    print(f"Sending to telegram: {caption} of date: {postDto.dt}")
-
-    try:
-        data = {
-            "chat_id": chatID,
-            "photo": postDto.img_url,
-            "caption": caption,
-            "parse_mode": "HTML",
-        }
-        response = requests.post(apiURL, json=data, headers=headers)
-    except Exception as e:
-        print(e)
-
-def get_hindi_translation(original):
-    api_key = os.getenv("OPENAI_API_KEY")
-    client = OpenAI(api_key=api_key)
-    content = f"Return translation to Hindi '{original}'"
-
-    chat_completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "user", "content": content}
-        ],
-    )
-
-    hindi_translation = chat_completion.choices[0].message.content
-    return hindi_translation
-
-def get_hindi_translation_limited(original, limit):
-    api_key = os.getenv("OPENAI_API_KEY")
-    client = OpenAI(api_key=api_key)
-    content = f"Return translation to Hindi. Do not exceed {limit} characters. Keep link in the beginning: '{original}'"
-
-    chat_completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "user", "content": content}
-        ],
-    )
-
-    hindi_translation = chat_completion.choices[0].message.content
-    return hindi_translation
-
-
-def get_hindi_translation_limited2(original, limit):
-    api_key = os.getenv("OPENAI_API_KEY")
-    client = OpenAI(api_key=api_key)
-    content = f"Formulate text to be an article. Return translation to Hindi. Do not exceed {limit} characters. Keep Markdown format: '{original}'"
-
-    chat_completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "user", "content": content}
-        ],
-    )
-
-    hindi_translation = chat_completion.choices[0].message.content
-    return hindi_translation
-
 def enrich_with_article_data(postDto):
     response = get_page_data(postDto.url)
     if response.status_code == 200:
@@ -229,16 +105,20 @@ def main():
             return
         else:
             print("Found new articles: ", len(actual_elements))
-
+            
+        apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
+        chatID = os.getenv("TELEGRAM_CHAT_ID")
+        hindiTranslator = HindiTranslator()
+        telegramPublisher = TelegramPublisher(apiToken, chatID, hindiTranslator)
         for index, postDto in enumerate(actual_elements):
             # if index % 2 == 0:
             postDto = enrich_with_article_data(postDto)
-            send_photo_to_telegram(postDto)
+            telegramPublisher.send_photo_to_telegram(postDto)
             # send_message_with_image_to_telegram(postDto)
             sent_urls.append(postDto.url)
             update_sent_urls(sent_urls)
             # else:
-            #     send_message_to_telegram(element)
+            #     send_message_to_telegram(postDto)
             break
 
         save_latest_date(postDto.dt)
