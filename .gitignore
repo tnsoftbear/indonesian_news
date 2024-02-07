@@ -2,4 +2,4 @@
 .env
 __pycache__
 mystuff
-storage/*
+scrap/storage/*

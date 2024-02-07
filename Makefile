@@ -4,8 +4,14 @@ pf = -p scrap-news
 build:
 	docker compose $(cf) $(pf) build
 up:
-	docker compose $(cf) up -d
+	docker compose $(cf) $(pf) up -d
 down:
-	docker compose $(cf) down --remove-orphans
+	docker compose $(cf) $(pf) down --remove-orphans
+rebuild:
+	@make down
+	@make build
+	@make up
 run:
 	docker compose $(cf) $(pf) run --rm scrappy
+sh:
+	docker run -it -v ./scrap:/scrap scrap-news-scrappy sh

@@ -3,3 +3,5 @@ requests==2.31.0
 python-telegram-bot==20.7
 python-dotenv==1.0.1
 openai==1.10.0
+#pillow==10.3.0
+#pyTelegramBotAPI==4.9.0

@@ -15,6 +15,10 @@
 
 5) Run `make run`
 
+## Logs
+
+`/scrap/storage/scrap.log`
+
 ## Development
 
 ```sh
