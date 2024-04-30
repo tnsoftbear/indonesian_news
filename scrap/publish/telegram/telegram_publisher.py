@@ -22,10 +22,16 @@ class TelegramPublisher:
     def send_message_with_image_to_telegram(self, postDto, input_limit=4092, output_limit=1024):
         article = postDto.article[:input_limit] if postDto.article is not None else ""
         original_text = f'**{postDto.title}**\n\n{article}'
-        # limit = 1024 - len(postDto.img_url) - 7;
         print(f"ORIGINAL TEXT: {original_text}")
+        if postDto.img_url:
+            output_limit -= len(postDto.img_url) - 6;
         hindi = self.hindiTranslator.get_hindi_translation_keep_markdown(original_text, output_limit)
-        text = f"[ ]({postDto.img_url} {hindi}"
+        if postDto.img_url:
+            text = f"[ ]({postDto.img_url}) {hindi}"
+        else:
+            text = f"{hindi}"
+        print(f"SENDING TO TELEGRAM: {text}")
+        print("Length: ", len(text))
         self.send_message(text, "Markdown")
     
     def send_photo_to_telegram(self, postDto, input_length=2048):

@@ -1,5 +1,11 @@
 # Scrap Bot
 
+This application do the following:
+
+* Scraps news from [Business Standard](https://www.business-standard.com/) with image.
+* Translates text into Hindi and adjust it to conform requirements of Telegram post.
+* Posts it to Telegram channel.
+
 ## Installation
 
 1) Make sure you have `make` tool installed:
