@@ -2,4 +2,9 @@
 .env
 __pycache__
 mystuff
-scrap/storage/*
+# Runtime data in storage/ - exclude binary/logs, keep the directory itself
+scrap/storage/*.db
+scrap/storage/*.db-wal
+scrap/storage/*.db-shm
+scrap/storage/*.log
+scrap/storage/*.txt

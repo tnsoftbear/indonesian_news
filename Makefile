@@ -15,3 +15,6 @@ run:
 	docker compose $(cf) $(pf) run --rm scrappy
 sh:
 	docker run -it -v ./scrap:/scrap scrap-news-scrappy sh
+amend:
+	git add .
+	git commit --amend --no-edit

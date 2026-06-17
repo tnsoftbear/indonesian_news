@@ -30,18 +30,8 @@ def read_latest_news(sid, actualPostsExtractor):
     print(msg)
     return None
 
-def ensure_storage_files():
-    """Create storage directory and required files if they don't exist."""
-    os.makedirs("storage", exist_ok=True)
-    if not os.path.exists("storage/sent_urls.txt"):
-        with open("storage/sent_urls.txt", "w") as f:
-            f.write("")
-    if not os.path.exists("storage/saved_date.txt"):
-        with open("storage/saved_date.txt", "w") as f:
-            f.write("")
-
 def main():
-    ensure_storage_files()
+    os.makedirs("storage", exist_ok=True)
     sid = os.getenv("SID")
     if not sid:
         msg = "SID environment variable is not set. Please check your .env file."
