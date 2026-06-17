@@ -16,6 +16,13 @@ TELEGRAM_CHAT_ID="enter your chat id, like: -1002024351434 or @BharatKiSamachar"
 # Error 429 insufficient_quota means you need to add funds.
 OPENAI_API_KEY="enter your openai api key (starts with sk-)"
 
+# OpenAI Base URL (optional)
+# Set this to use a local LLM endpoint (e.g. LM Studio, Ollama) instead of OpenAI.
+# LM Studio default: http://127.0.0.1:1234/v1
+# When running inside Docker, use: http://host.docker.internal:1234/v1
+# Leave empty or remove this line to use OpenAI's default API endpoint.
+# OPENAI_BASE_URL="http://host.docker.internal:1234/v1"
+
 # Session Cookie from Business Standard
 # 1. Open https://www.business-standard.com/ in your browser
 # 2. Accept cookies if prompted

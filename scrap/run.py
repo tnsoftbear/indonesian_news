@@ -64,8 +64,10 @@ def main():
 
     apiToken = os.getenv("TELEGRAM_BOT_TOKEN")
     chatID = os.getenv("TELEGRAM_CHAT_ID")
-    hindiTranslator = HindiTranslator(os.getenv("OPENAI_API_KEY"))
-    imageGenerator = DalleImageGenerator(os.getenv("OPENAI_API_KEY"))
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_base_url = os.getenv("OPENAI_BASE_URL")
+    hindiTranslator = HindiTranslator(openai_api_key, base_url=openai_base_url)
+    imageGenerator = DalleImageGenerator(openai_api_key, base_url=openai_base_url)
     telegramPublisher = TelegramPublisher(apiToken, chatID, logging, hindiTranslator, imageGenerator)
     for index, postDto in enumerate(actual_posts):
         postDto = enrich_with_article_data(postDto, sid) # добавить содержимое статьи

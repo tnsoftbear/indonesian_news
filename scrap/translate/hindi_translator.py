@@ -3,8 +3,9 @@ from openai import OpenAI
 class HindiTranslator:
     RETURN_TRANSLATION = "Return translation to Hindi"
     KEEP_MARKDOWN = "Keep Markdown format"
-    def __init__(self, api_key):
+    def __init__(self, api_key, base_url=None):
         self.api_key = api_key
+        self.base_url = base_url
 
     def get_hindi_translation(self, original):
         prompt = f"{self.RETURN_TRANSLATION}\n Input:\n```\n'{original}'\n```"
@@ -24,9 +25,13 @@ class HindiTranslator:
 
     def fetch_hindi(self, prompt):
         try:
-            client = OpenAI(api_key=self.api_key)
+            kwargs = {"api_key": self.api_key}
+            if self.base_url:
+                kwargs["base_url"] = self.base_url
+            client = OpenAI(**kwargs)
+            model = "local" if self.base_url else "gpt-3.5-turbo"
             chat_completion = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=model,
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
