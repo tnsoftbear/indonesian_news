@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 class HindiTranslator:
-    RETURN_TRANSLATION = "Return translation to Hindi"
+    RETURN_TRANSLATION = "Return translation to Hindi using Devanagari script (हिंदी). Do NOT use Hinglish or Latin transliteration."
     KEEP_MARKDOWN = "Keep Markdown format"
     def __init__(self, api_key, base_url=None):
         self.api_key = api_key
@@ -20,7 +20,7 @@ class HindiTranslator:
         return self.fetch_hindi(prompt)
 
     def get_hindi_translation_keep_markdown(self, original, limit):
-        prompt = f"Formulate text to be an article. It may contain multiple numbers scrapped from tabular html data, exclude it from answer. Return translation to Hindi. Do not exceed {limit} characters. {self.KEEP_MARKDOWN}.\n Input:\n```\n'{original}'\n```"
+        prompt = f"Formulate text to be an article. It may contain multiple numbers scrapped from tabular html data, exclude it from answer. {self.RETURN_TRANSLATION}. Do not exceed {limit} characters. {self.KEEP_MARKDOWN}.\n Input:\n```\n'{original}'\n```"
         return self.fetch_hindi(prompt)
 
     def fetch_hindi(self, prompt):

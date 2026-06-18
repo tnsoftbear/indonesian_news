@@ -13,8 +13,12 @@ rebuild:
 	@make up
 run:
 	docker compose $(cf) $(pf) run --rm scrappy
+run-local:
+	cd scrap && python3 run.py
 sh:
 	docker run -it -v ./scrap:/scrap scrap-news-scrappy sh
 amend:
 	git add .
 	git commit --amend --no-edit
+push:
+	git push --force-with-lease origin main
